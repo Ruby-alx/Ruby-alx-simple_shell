@@ -57,8 +57,8 @@ Our shell can run outside programs by typing their absolute paths (/bin/ls) or t
 ```sh
 $ ls -l
 total 8
-drwxrwxr-x 1 vagrant vagrant Apr 2 13:23 directory_1
-drwxrwxr-x 2 vagrant vagrant Apr 2 20:30 directory_2
+drwxrwxr-x 1 vagrant vagrant Aug 23 13:23 directory_1
+drwxrwxr-x 2 vagrant vagrant Aug 23 20:30 directory_2
 ```
 
 ```sh
