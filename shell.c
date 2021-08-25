@@ -1,4 +1,4 @@
-#include "stuff.h"
+#include "main.h"
 
 /**
  * main - calls the necessary functions for the shell
