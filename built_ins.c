@@ -1,4 +1,4 @@
-#include "stuff.h"
+#include "main.h"
 
 int cd_func(char **args);
 int help_func(char **args);
