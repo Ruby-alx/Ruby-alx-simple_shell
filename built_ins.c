@@ -1,95 +1,90 @@
-#include "main.h"
+#include "stuff.h"
+
+int cd_func(char **args);
+int help_func(char **args);
+int exit_func(char **args);
+int exec_func(char **args);
+char *builtin_str[] = {
+	"cd",
+	"help",
+	"exit",
+	"env"
+};
+
+int (*builtin_func[]) (char **) = {
+	&cd_func,
+	&help_func,
+	&exit_func,
+	&env_func
+};
 
 /**
- * findBuiltIns - validates if command is builtin and executes
- * @build: input build
- * Return: true if found, false if not
+ * num_builtins - returns the number of characters from a
+ * built-in string
+ * Return: as stated above
  */
-_Bool findBuiltIns(config *build)
+int num_builtins(void)
 {
-	register int i = 0;
-	type_b getBuiltIns[] = {
-		{"exit", exitFunc},
-		{"env", envFunc},
-		{"history", historyFunc},
-		{"alias", aliasFunc},
-		{"cd", cdFunc},
-		{"setenv", setenvFunc},
-		{"unsetenv", unsetenvFunc},
-		{"help", helpFunc},
-		{NULL, NULL}
-	};
-
-	while (getBuiltIns[i].command)
-	{
-		if (_strcmp(build->args[0], getBuiltIns[i].command) == 0)
-		{
-			getBuiltIns[i].func(build);
-			freeArgsAndBuffer(build);
-			return (true);
-		}
-		i++;
-	}
-	return (false);
+	return (sizeof(builtin_str) / sizeof(char *));
 }
-
 /**
- * exitFunc - exits the application
- * @build: input build
- * Return: 1 on success, 0 on failure
+ * cd_func - changes directory to the one provided in the next
+ * argument
+ * @args: the string token it receives as arguments
+ * Return: an int
  */
-int exitFunc(config *build)
-{
-	register int argCount, exitStatus;
 
-	argCount = countArgs(build->args);
-	if (argCount == 1)
+int cd_func(char **args)
+{
+	if (args[1] == NULL)
+		fprintf(stderr, "Provide arguments");
+	else
 	{
-		freeMembers(build);
-		if (build->errorStatus)
-			exit(build->errorStatus);
-		exit(EXIT_SUCCESS);
-	}
-	else if (argCount > 1)
-	{
-		exitStatus = _atoi(build->args[1]);
-		if (exitStatus == -1)
-		{
-			errno = EILLEGAL;
-			build->errorStatus = 2;
-			errorHandler(build);
-			return (0);
-		}
-		freeMembers(build);
-		exit(exitStatus);
+		if (chdir(args[1]) != 0)
+			perror("Shell");
 	}
 	return (1);
 }
-
 /**
- * historyFunc - displays command history
- * @build: input build
- * Return: 1 on success, 0 on failure
+ * help_func - changes directory to the one provided in the next
+ * argument
+ * @args: string token
+ * Return: an int
  */
-int historyFunc(config *build)
+int help_func(char **args)
 {
-	char *str = "Currently in development\n";
+	int i;
 
-	(void)build;
-	write(STDOUT_FILENO, str, _strlen(str));
+	printf("Simple shell by Amos and Miheret\n");
+	printf("Usage: <command> <arguments>\n");
+	printf("Here's a list of builtin commands:\n");
+
+	for (i = 0; i < num_builtins(); i++)
+	{
+		printf(" %s\n", builtin_str[i]);
+	}
+
+	printf("run ./man_1_simple_shell for more info.\n");
+
 	return (1);
 }
-
 /**
- * aliasFunc - displays local aliases
- * @build: input build
- * Return: 1 on success, 0 on failure
+ * exit_func - exits the shell
+ * @args: string token
+ * Return: 0
  */
-int aliasFunc(config *build)
+int exit_func(char **args)
 {
-	char *str = "Currently in development\n";
+	return (0);
+}
+/**
+ * env_func - should print the environment variables
+ * @args: pointer to the string
+ *Return: 1
+ */
+int env_func(char **args)
+{
+	system("/bin/printenv");
 
-	(void)build;
-	write(STDOUT_FILENO, str, _strlen(str));
 	return (1);
 }
