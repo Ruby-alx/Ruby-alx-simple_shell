@@ -1,150 +1,168 @@
-#include "main.h"
+#include "stuff.h"
 
 /**
- * shell - simple shell
- * @build: input build
+ * main - calls the necessary functions for the shell
+ * @argc: argument counter
+ * @argv: actual arguments
+ * Return: 0 or 1
  */
-void shell(config *build)
+int main(int argc, char **argv)
 {
-	while (true)
-	{
-		checkAndGetLine(build);
-		if (splitString(build) == false)
-			continue;
-		if (findBuiltIns(build) == true)
-			continue;
-		checkPath(build);
-		forkAndExecute(build);
-	}
+/*initiate the shell loop*/
+	char *usrIn;
+	char **args;
+	int status;/*controls the closing or opening of the shell*/
+
+	do {
+		printf("MnA$ ");/*print the shell dollar sign*/
+		usrIn = read_line();/*calling function for user input*/
+		args = split(usrIn);/*split input into arguments with strok*/
+		status = exec_func(args);/*calling execve on child processes*/
+		/*memory management*/
+		free(usrIn);
+		free(args);
+	} while (status);
+
+	return (0);
 }
-
 /**
- * checkAndGetLine - check stdin and retrieves next line; handles
- * prompt display
- * @build: input build
+ * read_line - gets the input from the shell
+ * Return: line or -1
  */
-void checkAndGetLine(config *build)
+char *read_line(void)
 {
-	register int len;
-	size_t bufferSize = 0;
-	char *ptr, *ptr2;
+	size_t size = 0;/*Expected size of input*/
+	char *string_ptr = NULL;/*Output*/
 
-	build->args = NULL;
-	build->envList = NULL;
-	build->lineCounter++;
-	if (isatty(STDIN_FILENO))
-		displayPrompt();
-	len = getline(&build->buffer, &bufferSize, stdin);
-	if (len == EOF)
+	if (getline(&string_ptr, &size, stdin) == -1)/*check errors in input*/
 	{
-		freeMembers(build);
-		if (isatty(STDIN_FILENO))
-			displayNewLine();
-		if (build->errorStatus)
-			exit(build->errorStatus);
-		exit(EXIT_SUCCESS);
-
-	}
-	ptr = _strchr(build->buffer, '\n');
-	ptr2 = _strchr(build->buffer, '\t');
-	if (ptr || ptr2)
-		insertNullByte(build->buffer, len - 1);
-	stripComments(build->buffer);
-}
-
-/**
- * stripComments - remove comments from input string
- * @str: input string
- * Return: length of remaining string
- */
-void stripComments(char *str)
-{
-	register int i = 0;
-	_Bool notFirst = false;
-
-	while (str[i])
-	{
-		if (i == 0 && str[i] == '#')
+		if (feof(stdin))/*check for EOF*/
 		{
-			insertNullByte(str, i);
-			return;
+			printf("\n");
+			exit(EXIT_SUCCESS);/*we got an EOF*/
 		}
-		if (notFirst)
+		else
 		{
-			if (str[i] == '#' && str[i - 1] == ' ')
+			perror("Command not found!");
+			exit(EXIT_SUCCESS);
+		}
+	}
+	while (string_ptr[0] == '\n')/*if empty line ask again*/
+	{
+		printf("$ ");
+		getline(&string_ptr, &size, stdin);
+	}
+
+	return (string_ptr);/*return the input read from the terminal*/
+}
+/**
+ * split - breaks the string into tokens for execution
+ * @str: string pointer we'll receive
+ * Return: void but should be 0 for sucess, -1 for failure
+ */
+
+char **split(char *str)
+{
+	int bufsize = TOK_BUFSIZE, pos = 0;
+	char **pieces = malloc(bufsize * (sizeof(char *)));
+	char *piece;
+
+	if (!pieces)/*malloc error check*/
+	{
+		fprintf(stderr, "Malloc error\n");
+		exit(EXIT_FAILURE);
+	}
+
+	piece = strtok(str, TOK_DELIM);/*point to string to split*/
+	while (piece != NULL)
+	{
+		pieces[pos] = piece;/*add token to list of tokens*/
+		pos++;
+
+		/*check if pos>bufsize and reallocate mem*/
+		if (pos >= bufsize)
+		{
+			bufsize += TOK_BUFSIZE;
+			pieces = realloc(pieces, bufsize * sizeof(char *));
+			if (!pieces)
 			{
-				insertNullByte(str, i);
-				return;
+				fprintf(stderr, "Malloc error\n");
+				exit(EXIT_FAILURE);
 			}
 		}
-		i++;
-		notFirst = true;
+		piece = strtok(NULL, TOK_DELIM);/*keep pointing to same string*/
 	}
+	pieces[pos] = NULL;
+	return (pieces);
+
 }
 
 /**
- * forkAndExecute - fork current build and execute processes
- * @build: input build
+ * launch_sh - runs the fork and exec functions to run multiple
+ * programs via the shell
+ * @args: pointer for arguments to be executed
+ * Return: exit or 1 for success
  */
-void forkAndExecute(config *build)
+
+int launch_sh(char **args)
 {
+	pid_t pid;
 	int status;
-	pid_t f1 = fork();
 
-	convertLLtoArr(build);
-	if (f1 == -1)
+	pid = fork();
+	if (pid == 0)/*check for child process*/
 	{
-		perror("error\n");
-		freeMembers(build);
-		freeArgs(build->envList);
-		exit(1);
-	}
-	if (f1 == 0)
-	{
-		if (execve(build->fullPath, build->args, build->envList) == -1)
+		/*run an exec to run a program on the child process*/
+		if (execve(args[0], args, NULL) == -1)
 		{
-			errorHandler(build);
-			freeMembers(build);
-			freeArgs(build->envList);
-			if (errno == ENOENT)
-				exit(127);
-			if (errno == EACCES)
-				exit(126);
+			perror("Invalid command");
 		}
-	} else
-	{
-		wait(&status);
-		if (WIFEXITED(status))
-			build->errorStatus = WEXITSTATUS(status);
-		freeArgsAndBuffer(build);
-		freeArgs(build->envList);
+		exit(EXIT_FAILURE);
 	}
+	else if (pid < 0)
+	{
+		perror("Fork failure");
+	}
+	else /*for parent process, wait for child to complete*/
+	{
+		do {
+			waitpid(pid, &status, WUNTRACED);/*check for these*/
+		} while (!WIFEXITED(status) && !WIFSIGNALED(status));
+	}
+
+	return (1);
 }
-
 /**
- * convertLLtoArr - convert linked list to array
- * @build: input build
+ * exec_func - executes the shell
+ * @args: the arguments received
+ * Return: 1 or shell launch
  */
-void convertLLtoArr(config *build)
-{
-	register int i = 0;
-	size_t count = 0;
-	char **envList = NULL;
-	linked_l *tmp = build->env;
 
-	count = list_len(build->env);
-	envList = malloc(sizeof(char *) * (count + 1));
-	if (!envList)
+int exec_func(char **args)
+{
+	int i;
+	char *builtin_str[] = {
+		"cd",
+		"help",
+		"exit",
+		"env"
+	};
+	int (*builtin_func[]) (char **) = {
+		&cd_func,
+		&help_func,
+		&exit_func,
+		&env_func
+	};
+
+	if (args[0] == NULL)
+		return (1);
+
+	for (i = 0; i < num_builtins(); i++)
 	{
-		perror("Malloc failed\n");
-		exit(1);
+		if (strcmp(args[0], builtin_str[i]) == 0)
+		{
+			return ((*builtin_func[i])(args));
+		}
 	}
-	while (tmp)
-	{
-		envList[i] = _strdup(tmp->string);
-		tmp = tmp->next;
-		i++;
-	}
-	envList[i] = NULL;
-	build->envList = envList;
+	return (launch_sh(args));
 }
